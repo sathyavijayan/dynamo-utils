@@ -1,6 +1,7 @@
 # dynamo-utils
 
-WIP::
+WIP:: The code in this repo at the moment is basically my experiments
+in the REPL. Im still shaping a lot of the details including the API.
 
 Contains core set of functions to perform the following CRUD operations.
 

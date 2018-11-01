@@ -1,6 +1,7 @@
 (ns dynamo-utils.core
   (:require [amazonica.aws.dynamodbv2 :as dyn]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [inflections.core :refer [plural]])
   (:gen-class))
 
 
@@ -30,10 +31,10 @@
 
 
 (defmacro create-item
-  [fname model-name creds tbl-spec]
+  [fname model-name tbl-spec]
   `(defn ~(symbol fname)
-     [i#]
-     (create-item* ~creds ~tbl-spec i#)))
+     [c# i#]
+     (create-item* c# ~tbl-spec i#)))
 
 
 
@@ -63,17 +64,17 @@
 
 
 (defmacro find-item-by-hash-key
-  [fname model-name creds tbl-spec]
+  [fname model-name tbl-spec]
   `(defn ~fname
-     [hk#]
-     (find-item* ~creds ~tbl-spec hk#)))
+     [c# hk#]
+     (find-item* c# ~tbl-spec hk#)))
 
 
 (defmacro find-item-by-hash-and-range-key
-  [fname model-name creds tbl-spec]
+  [fname model-name tbl-spec]
   `(defn ~fname
-     [hk# rk#]
-     (find-item* ~creds ~tbl-spec hk# rk#)))
+     [c# hk# rk#]
+     (find-item* c# ~tbl-spec hk# rk#)))
 
 
 
@@ -134,7 +135,6 @@
 (defmacro defmodel
   [model-name & opts]
   (let [__args         (apply hash-map opts)
-        __creds        (:creds __args)
         __tbl-spec     (dissoc __args :creds)
         __hk-col-name  (symbol (:hash-key-col-name __tbl-spec))
         __rk-col-name  (some-> (:range-key-col-name __tbl-spec)
@@ -142,13 +142,16 @@
     `(do
        (create-item ~(symbol (str "create-" model-name))
                     model-name
-                    ~__creds
                     ~__tbl-spec)
 
        (find-item-by-hash-key
-        ~(symbol (str "find-" model-name "-by-" __hk-col-name))
+        ~(symbol (str "find-"
+                      (if __rk-col-name
+                        (plural model-name)
+                        model-name)
+                      "-by-"
+                      __hk-col-name))
         model-name
-        ~__creds
         ~__tbl-spec)
 
        ~(when __rk-col-name
@@ -156,7 +159,6 @@
             ~(symbol (str "find-" model-name "-by-" __hk-col-name
                           "-and-" __rk-col-name))
             model-name
-            ~__creds
             ~__tbl-spec)))))
 
 
@@ -167,22 +169,19 @@
   (def creds {:endpoint "http://localhost:6060"})
 
 
-  (defmodel events
-    :creds creds
+  (defmodel event
     :table-name "Events"
     :hash-key-col-name "id"
     :range-key-col-name "ts"
     :mvcc-ver-col-name "__ver")
 
-
   ;;
 
-  (create-events {:id "100010" :ts "00100100143"})
+  (create-event creds {:id "100011" :ts "00100100145"})
 
-  (find-events-by-id "100010")
+  (find-events-by-id creds "100011")
 
-  (find-events-by-id-and-ts "100010" "0010010013")
-
+  (find-event-by-id-and-ts creds "100011" "00100100145")
 
 
   (dyn/delete-table creds :table-name "Events")
@@ -198,13 +197,12 @@
                 {:read-capacity-units 1
                  :write-capacity-units 1})
 
-  (defmodel users
-    :creds creds
+  (defmodel user
     :table-name "Users"
     :hash-key-col-name "id"
     :mvcc-ver-col-name "__ver")
 
-  (find-users-by-id "svittal@gmail.com")
 
+  (find-user-by-id creds "svittal@gmail.com")
 
   )
